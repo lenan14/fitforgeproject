@@ -1,3 +1,5 @@
+// [Defines Root Layout of the Entire Website] //
+
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
@@ -18,7 +20,7 @@ export const metadata: Metadata = {
 };
 
 export default function RootLayout({
-  children,
+  children, // Current Page Content
 }: Readonly<{
   children: React.ReactNode;
 }>) {
