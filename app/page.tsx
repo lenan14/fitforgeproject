@@ -1,8 +1,7 @@
 'use client';
-import { AppRouterInstance } from "next/dist/shared/lib/app-router-context.shared-runtime";
 import Link from "next/link";
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 export default function Home() {
   const router = useRouter();
@@ -12,6 +11,7 @@ export default function Home() {
 
   // [Auto-Login] \\
   useEffect(() => {
+    if (typeof window === 'undefined') return;
     const savedUser = localStorage.getItem("username");
 
     if (savedUser) {
@@ -93,9 +93,5 @@ export default function Home() {
 
       <div className="pointer-events-none absolute inset-0 bg-black/20" />
     </div>
-  )
-}
-
-function useEffect(arg0: () => void, arg1: AppRouterInstance[]) {
-  throw new Error("Function not implemented.");
+  );
 }
