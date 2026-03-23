@@ -1,4 +1,5 @@
 'use client';
+import { AppRouterInstance } from "next/dist/shared/lib/app-router-context.shared-runtime";
 import Link from "next/link";
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
@@ -93,4 +94,8 @@ export default function Home() {
       <div className="pointer-events-none absolute inset-0 bg-black/20" />
     </div>
   )
+}
+
+function useEffect(arg0: () => void, arg1: AppRouterInstance[]) {
+  throw new Error("Function not implemented.");
 }
