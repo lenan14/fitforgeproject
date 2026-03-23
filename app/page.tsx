@@ -1,7 +1,7 @@
-"use client";
-
-import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+'use client';
+import Link from "next/link";
+import { useRouter } from 'next/navigation';
+import { useState, useEffect } from 'react';
 
 export default function Home() {
   const router = useRouter();
@@ -11,6 +11,7 @@ export default function Home() {
 
   // [Auto-Login] \\
   useEffect(() => {
+    if (typeof window === 'undefined') return;
     const savedUser = localStorage.getItem("username");
 
     if (savedUser) {
@@ -55,43 +56,42 @@ export default function Home() {
   };
 
   return (
-    <div className="Intro-Container">
+    <div className="relative min-h-screen w-full overflow-hidden">
+      {/* Fullscreen background SVG */}
+      <img
+        src="/background.svg"
+        alt="Background"
+        className="absolute inset-0 h-full w-full object-cover"
+      />
 
-      {/* [Introduction] */}
-      <h1 className="Intro-Title">Welcome to Fit Forge</h1>
-
-      <p className="Intro-Description">
-        "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut 
-        labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris 
-        nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit 
-        esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, 
-        sunt in culpa qui officia deserunt mollit anim id est laborum."
-      </p>
-
-      {/* Autehntication */}
-      <div className="Authen-Container">
-
-        <h2 className="Authen-Title">Welcome to the Playground</h2>
-
-        <p className="Authen-Description">
-          Login or Create an Account.
-        </p>
-
-        <br /><br />
-
-        <input
-          type="password" 
-          className="Authen-Input"
-          placeholder="Password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
+      {/* Button-right temp button that navigates to main avatar screen */}
+      <Link href="/main" aria-label="Go to main avatar screen">
+        <img
+          src="/temp button.svg"
+          alt="Temporary main button"
+          className="absolute right-0 bottom-0 z-20 h-[400px] w-[400px] cursor-pointer"
+          style={{ filter: "none", boxShadow: "none", background: "transparent" }}
         />
+      </Link>
 
-        <br /><br />
+      {/* Center overlay with welcome + login SVG */}
+      <div className="relative z-10 flex min-h-screen items-center justify-center px-6 py-10">
+        <div className="max-w-lg text-center">
+          <Link href="/login" aria-label="Go to login page">
+            <img
+              src="/welcome + login button.svg"
+              alt="Welcome and Login"
+              className="mx-auto mb-6 h-auto w-full max-w-[670px] cursor-pointer select-none"
+            />
+          </Link>
 
-        <button className="Authen-Btn" onClick={handleCreate}>Regiter</button>
-
+          <p className="text-sm text-white/90">
+            Tap the welcome image to go to /login.
+          </p>
+        </div>
       </div>
+
+      <div className="pointer-events-none absolute inset-0 bg-black/20" />
     </div>
-  )
+  );
 }
