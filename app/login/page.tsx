@@ -1,15 +1,51 @@
-import Link from "next/link";
+"use client";
+
+import { signInWithPopup } from "firebase/auth";
+import type { Auth, GoogleAuthProvider } from "firebase/auth";
+import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 
 export default function LoginPage() {
+  const router = useRouter();
+
+  const [auth, setAuth] = useState<Auth | null>(null);
+  const [googleProvider, setGoogleProvider] = useState<GoogleAuthProvider | null>(null);
+
+  useEffect(() => {
+    async function loadFirebase() {
+      const firebase = await import("@/lib/firebase");
+      setAuth(firebase.auth);
+      setGoogleProvider(firebase.googleProvider);
+    }
+
+    loadFirebase();
+  }, []);
+
+  async function handleGoogleLogin() {
+    if (!auth || !googleProvider) return;
+
+    try {
+      const result = await signInWithPopup(auth, googleProvider);
+      const user = result.user;
+
+      console.log("Logged in as:", user.displayName, user.email);
+      router.push("/main");
+    } catch (error) {
+      console.error("Login failed:", error);
+    }
+  }
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-900 text-white">
-      <div className="rounded-2xl border border-white/20 bg-black/70 p-10 text-center shadow-2xl">
-        <h1 className="mb-4 text-3xl font-bold">Login Page</h1>
-        <p className="mb-6 text-zinc-300">This is the login destination page. The auth form will be here once we get that working.</p>
-        <Link href="/" className="rounded-lg bg-white px-5 py-2 font-semibold text-black hover:bg-zinc-200">
-          Back to Welcome Page
-        </Link>
-      </div>
+    <div className="flex min-h-screen flex-col items-center justify-center" style={{ backgroundColor: "#f8e7e0" }}>
+      <img src="/login-design.svg" alt="Login design" className="mb-6 mx-auto max-w-full" style={{ width: "900px", height: "auto" }} />
+
+      <button
+        onClick={handleGoogleLogin}
+        className="flex items-center gap-3 rounded-lg bg-white px-6 py-3 font-semibold text-black shadow-md hover:bg-zinc-100"
+      >
+        <img src="https://www.google.com/favicon.ico" alt="Google" className="h-5 w-5" />
+        Sign in with Google
+      </button>
     </div>
   );
 }
