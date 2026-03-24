@@ -1,60 +1,6 @@
-'use client';
 import Link from "next/link";
-import { useRouter } from 'next/navigation';
-import { useState, useEffect } from 'react';
 
 export default function Home() {
-  const router = useRouter();
-
-  const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
-
-  // [Auto-Login] \\
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const savedUser = localStorage.getItem("username");
-
-    if (savedUser) {
-      router.push("/feed");
-    }
-  }, [router]);
-
-  // [Login] \\
-  const handleLogin = () => {
-    const users = JSON.parse(localStorage.getItem("users") || "{}");
-
-    if (!users[username]) {
-      alert("Account doesn't exists")
-      return;
-    }
-
-    if (users[username] !== password) {
-      alert("Incorrect password.");
-      return;
-    }
-
-    localStorage.setItem("username", username);
-
-    router.push("/feed")
-  };
-
-  // [Create Account] \\
-  const handleCreate = () => {
-    const users = JSON.parse(localStorage.getItem("users") || "{}");
-
-    if (users[username]) {
-      alert("Username already exists.");
-      return;
-    }
-
-    users[username] = password;
-
-    localStorage.setItem("users", JSON.stringify(users));
-    localStorage.setItem("username", username);
-
-    router.push("/feed");
-  };
-
   return (
     <div className="relative min-h-screen w-full overflow-hidden">
       {/* Fullscreen background SVG */}
