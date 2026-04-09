@@ -4,6 +4,7 @@ import { signInWithPopup } from "firebase/auth";
 import type { Auth, GoogleAuthProvider } from "firebase/auth";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { saveUserProfile } from "@/lib/firestore";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -17,7 +18,6 @@ export default function LoginPage() {
       setAuth(firebase.auth);
       setGoogleProvider(firebase.googleProvider);
     }
-
     loadFirebase();
   }, []);
 
@@ -27,6 +27,12 @@ export default function LoginPage() {
     try {
       const result = await signInWithPopup(auth, googleProvider);
       const user = result.user;
+
+      // Save user to Firestore on first login
+      await saveUserProfile(user.uid, {
+        name: user.displayName ?? "Unknown",
+        email: user.email ?? "",
+      });
 
       console.log("Logged in as:", user.displayName, user.email);
       router.push("/main");
@@ -38,7 +44,6 @@ export default function LoginPage() {
   return (
     <div className="flex min-h-screen flex-col items-center justify-center" style={{ backgroundColor: "#f8e7e0" }}>
       <img src="/login-design.svg" alt="Login design" className="mb-6 mx-auto max-w-full" style={{ width: "900px", height: "auto" }} />
-
       <button
         onClick={handleGoogleLogin}
         className="flex items-center gap-3 rounded-lg bg-white px-6 py-3 font-semibold text-black shadow-md hover:bg-zinc-100"
