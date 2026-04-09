@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { onAuthStateChanged, signOut } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import { useRouter } from "next/navigation";
+import { saveWorkout, saveBodyProgression, getUserProfile, getBodyProgression } from "@/lib/firestore";
 
 const upperWorkoutOptions = {
   noEquipment: [
@@ -120,6 +121,8 @@ export default function MainPage() {
   const [totalXP, setTotalXP] = useState(0);
   const [streak, setStreak] = useState(0);
   const [lastCompletionDate, setLastCompletionDate] = useState<string | null>(null);
+  const [userId, setUserId] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
   // [Sign out Function] //
   const handleSignOut = async () => {
@@ -404,35 +407,51 @@ export default function MainPage() {
 
   // [Confirm Task]
   // Purpose: Make Sure Tasks is Complete According to Time
-  const handleConfirmTask = (task: WorkoutTask) => {
+  const handleConfirmTask = async (task: WorkoutTask) => {
     const elapsedTime = getElapsedTime(task.timestamp);
     const minimumTime = calculateMinimumTime(task);
-
-    if (elapsedTime < minimumTime) {
-      alert(`This workout is impossible to complete in ${elapsedTime} minute(s). Minimum required time is ${minimumTime} minute(s).`);
-      return;
-    }
-
+    //if (elapsedTime < minimumTime) {
+    //  alert(`Minimum required time is ${minimumTime} minute(s). Elapsed: ${elapsedTime} min.`);
+    //  return;
+    //}
     const today = new Date();
     const lastDate = lastCompletionDate ? new Date(lastCompletionDate) : null;
     const isSameDay = lastDate && today.toDateString() === lastDate.toDateString();
     const isYesterday = lastDate && new Date(today.getFullYear(), today.getMonth(), today.getDate() - 1).toDateString() === lastDate.toDateString();
     const newStreak = isSameDay ? streak : isYesterday ? streak + 1 : 1;
     const earnedXP = calculateXPFromTask(task, newStreak);
-
-    setTasks((prevTasks) =>
-      prevTasks.map((t) =>
-        t.id === task.id
-          ? { ...t, status: "completed", xpEarned: earnedXP }
-          : t
-      )
+ 
+    // Update local state
+    const updatedTasks = tasks.map((t) =>
+      t.id === task.id ? { ...t, status: "completed" as const, xpEarned: earnedXP } : t
     );
-
-    setTotalXP((prevXP) => prevXP + earnedXP);
+    setTasks(updatedTasks);
+    setTotalXP((prev) => prev + earnedXP);
     setStreak(newStreak);
     setLastCompletionDate(today.toISOString());
-
-    console.log("Workout completed:", task, "earnedXP:", earnedXP, "streak:", newStreak);
+ 
+    // Save to Firestore
+    if (userId) {
+      try {
+        await saveWorkout(userId, {
+          date: today.toISOString(),
+          exercises: [{
+            exercise: task.workout,
+            category: task.category,
+            equipmentType: task.equipmentType,
+            sets: parseInt(task.sets),
+            reps: parseInt(task.reps),
+            weight: task.weight === "Bodyweight" ? "Bodyweight" : parseFloat(task.weight),
+          }],
+          streakAtTime: newStreak,
+          xpEarned: earnedXP,
+        });
+        const updatedProgression = calculateBodyAttributeProgression(updatedTasks);
+        await saveBodyProgression(userId, updatedProgression as Record<string, number>);
+      } catch (error) {
+        console.error("Failed to save to Firestore:", error);
+      }
+    }
   };
 
   const [, setRenderTrigger] = useState(0);
@@ -466,8 +485,22 @@ export default function MainPage() {
   };
 
   useEffect(() => {
-    return onAuthStateChanged(auth, (u) => {
-      if (!u) router.push("/login");
+    return onAuthStateChanged(auth, async (u) => {
+      if (!u) { router.push("/login"); return; }
+      setUserId(u.uid);
+      try {
+        const profile = await getUserProfile(u.uid);
+        if (profile) {
+          setTotalXP(profile.totalXP ?? 0);
+          setStreak(profile.streak ?? 0);
+          setLastCompletionDate(profile.lastCompletionDate ?? null);
+        }
+        await getBodyProgression(u.uid);
+      } catch (error) {
+        console.error("Failed to load user data:", error);
+      } finally {
+        setIsLoading(false);
+      }
     });
   }, [router]);
 
@@ -886,6 +919,7 @@ export default function MainPage() {
                   const elapsedTime = getElapsedTime(task.timestamp);
                   const minimumTime = calculateMinimumTime(task);
                   const canConfirm = elapsedTime >= minimumTime && task.status === "pending";
+                  //const canConfirm = task.status === "pending";//Testing without time constraint
                   const estimatedRewards = task.status === "pending" ? estimateTaskRewards(task) : null;
 
                   return (

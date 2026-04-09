@@ -21,22 +21,37 @@ import {
     | "legs"
     | "core";
   
+  export type BodyAttribute =
+    | "Chest"
+    | "Shoulders"
+    | "Arms"
+    | "Back"
+    | "Quads"
+    | "Hamstrings"
+    | "Glutes"
+    | "Calves"
+    | "Core"
+    | "Abs";
+  
   export type Level = "beginner" | "intermediate" | "advanced";
   
   export type Tier = 1 | 2 | 3 | 4 | 5;
   
   export interface WorkoutExercise {
-    exercise: string;       // e.g. "Bench Press"
-    muscleGroup: MuscleGroup;
+    exercise: string;                         // e.g. "Bench Press"
+    category: "upper" | "lower";
+    equipmentType: "noEquipment" | "equipment";
     sets: number;
     reps: number;
-    weight: number;         // in lbs
+    weight: number | "Bodyweight";            // lbs or "Bodyweight"
   }
   
   export interface Workout {
     id?: string;
-    date: string;           // ex. "2025-03-30"
+    date: string;                             // ISO string e.g. "2025-03-30"
     exercises: WorkoutExercise[];
+    streakAtTime: number;                     // streak when workout was logged
+    xpEarned: number;                         // total XP earned from this workout
     createdAt?: unknown;
   }
   
@@ -46,86 +61,122 @@ import {
     createdAt?: unknown;
   }
   
-  export interface MuscleProgress {
-    xp: number;
-    level: Level;
+  export interface BodyAttributeProgress {
+    value: number;                            // 0–100
     lastUpdated?: unknown;
   }
   
   export interface UserProfile {
     name: string;
     email: string;
-    totalXP: number;        // cumulative, never resets
-    tier: Tier;             // 1 to 5
-    tierXP: number;         // XP within current tier, resets on tier up
-    tierCap: number;        // XP needed to reach next tier
+    totalXP: number;                          // cumulative, never resets
+    tier: Tier;                               // 1 to 5
+    tierXP: number;                           // XP within current tier
+    tierCap: number;                          // XP cap for current tier
+    streak: number;                           // current streak in days
+    lastCompletionDate: string | null;        // ISO string of last workout completion
     createdAt?: unknown;
   }
-
-  //Tier XP caps for each tier level
-  export const TIER_CAPS: Record<Tier, number> = {
-    1: 200,
-    2: 400,
-    3: 700,
-    4: 1100,
-    5: 1600,
+  
+  export const TIER_THRESHOLDS: Record<Tier, number> = {
+    1: 1000,
+    2: 3000,
+    3: 7500,
+    4: 15000,
+    5: 30000,
   };
   
-  //Tier names for display purposes
   export const TIER_NAMES: Record<Tier, string> = {
     1: "Base Form",
-    2: "Active",
-    3: "Advanced",
-    4: "Athletic",
-    5: "Bodybuilder",
+    2: "Active Form",
+    3: "Advanced Form",
+    4: "Athletic Form",
+    5: "Bodybuilder Form",
   };
   
-  const XP_DIVISOR = 1000; // Scales down the raw volume to make XP realistic
-  
-  // Per muscle group thresholds
-  const MUSCLE_THRESHOLDS = {
-    intermediate: 100,
-    advanced: 500,
+  export const WORKOUT_XP_CONFIG: Record<string, { baseMultiplier: number; weightMultiplier?: number }> = {
+    "Push-Ups":              { baseMultiplier: 2 },
+    "Diamond Push-Ups":      { baseMultiplier: 2.2 },
+    "Pike Push-Ups":         { baseMultiplier: 2 },
+    "Plank Shoulder Taps":   { baseMultiplier: 1.8 },
+    "Pull-Ups":              { baseMultiplier: 2.5 },
+    "Bench Press":           { baseMultiplier: 1, weightMultiplier: 0.05 },
+    "One-Arm Dumbbell Row":  { baseMultiplier: 1, weightMultiplier: 0.05 },
+    "Shoulder Press":        { baseMultiplier: 1, weightMultiplier: 0.05 },
+    "Bicep Curls":           { baseMultiplier: 1, weightMultiplier: 0.05 },
+    "Tricep Dips":           { baseMultiplier: 1.2, weightMultiplier: 0.03 },
+    "Squats":                { baseMultiplier: 2 },
+    "Lunges":                { baseMultiplier: 2 },
+    "Jump Squats":           { baseMultiplier: 2.4 },
+    "Wall Sit":              { baseMultiplier: 1.5 },
+    "Calf Raises":           { baseMultiplier: 1.6 },
+    "Barbell Squat":         { baseMultiplier: 1, weightMultiplier: 0.05 },
+    "Deadlift":              { baseMultiplier: 1, weightMultiplier: 0.06 },
+    "Leg Press":             { baseMultiplier: 1, weightMultiplier: 0.05 },
+    "Romanian Deadlift":     { baseMultiplier: 1, weightMultiplier: 0.05 },
+    "Weighted Lunges":       { baseMultiplier: 1, weightMultiplier: 0.05 },
   };
   
-  export function calcXP(sets: number, reps: number, weight: number): number {
-    return (sets * reps * weight) / XP_DIVISOR;
-  }
+  /**
+   * Calculates XP for a single exercise, matching the frontend formula.
+   * Includes streak bonus (capped at 25%).
+   */
+  export function calcXP(
+    exercise: string,
+    sets: number,
+    reps: number,
+    weight: number | "Bodyweight",
+    streak: number
+  ): number {
+    const config = WORKOUT_XP_CONFIG[exercise] ?? { baseMultiplier: 2 };
+    const weightValue = typeof weight === "number" ? weight : 1;
+    const streakBonus = Math.min(streak * 0.05, 0.25);
   
-  export function calcMuscleLevel(xp: number): Level {
-    if (xp >= MUSCLE_THRESHOLDS.advanced) return "advanced";
-    if (xp >= MUSCLE_THRESHOLDS.intermediate) return "intermediate";
-    return "beginner";
+    const baseXP = config.weightMultiplier
+      ? sets * reps * weightValue * config.weightMultiplier
+      : sets * reps * config.baseMultiplier;
+  
+    return Math.round(baseXP * (1 + streakBonus));
   }
   
   /**
-   * Given current tier, tierXP, and new XP gained,
-   * returns the updated tier, tierXP, and tierCap.
-   * Handles tier-ups automatically.
+   * Determines tier from total cumulative XP.
+   * Matches the getTierFromXP function in the frontend.
    */
-  export function calcTierProgression(currentTier: Tier, currentTierXP: number, xpGained: number): { tier: Tier; tierXP: number; tierCap: number } {
-    let tier = currentTier;
-    let tierXP = currentTierXP + xpGained;
+  export function calcTier(totalXP: number): Tier {
+    if (totalXP >= 15000) return 5;
+    if (totalXP >= 7500)  return 4;
+    if (totalXP >= 3000)  return 3;
+    if (totalXP >= 1000)  return 2;
+    return 1;
+  }
   
-    // Keep checking if tierXP exceeds cap for current tier, and if so, tier up
-    while (tier < 5 && tierXP >= TIER_CAPS[tier]) {
-      tierXP -= TIER_CAPS[tier];
-      tier = (tier + 1) as Tier;
-    }
+  /**
+   * Calculates tierXP (XP within the current tier) from total XP.
+   */
+  export function calcTierXP(totalXP: number): number {
+    const tier = calcTier(totalXP);
+    const thresholds = [0, 1000, 3000, 7500, 15000, 30000];
+    return totalXP - thresholds[tier - 1];
+  }
   
-    // Cap at tier 5
-    if (tier === 5 && tierXP > TIER_CAPS[5]) {
-      tierXP = TIER_CAPS[5];
-    }
-  
-    return { tier, tierXP, tierCap: TIER_CAPS[tier] };
+  /**
+   * Calculates the muscle level based on body attribute progress value (0–100).
+   */
+  export function calcMuscleLevel(value: number): Level {
+    if (value >= 70) return "advanced";
+    if (value >= 40) return "intermediate";
+    return "beginner";
   }
   
   /**
    * Creates or updates a user profile in Firestore.
    * Called after Google sign-in. merge:true prevents overwriting existing data.
    */
-  export async function saveUserProfile(userId: string, profile: Pick<UserProfile, "name" | "email">): Promise<void> {
+  export async function saveUserProfile(
+    userId: string,
+    profile: Pick<UserProfile, "name" | "email">
+  ): Promise<void> {
     const ref = doc(db, "users", userId);
     await setDoc(
       ref,
@@ -134,7 +185,9 @@ import {
         totalXP: 0,
         tier: 1,
         tierXP: 0,
-        tierCap: TIER_CAPS[1],
+        tierCap: TIER_THRESHOLDS[1],
+        streak: 0,
+        lastCompletionDate: null,
         createdAt: serverTimestamp(),
       },
       { merge: true }
@@ -150,79 +203,49 @@ import {
     return snap.exists() ? (snap.data() as UserProfile) : null;
   }
   
-  
   /**
-   * Saves a workout session to Firestore.
-   * Automatically updates:
-   *   - totalXP (cumulative, never resets)
-   *   - tier, tierXP, tierCap (handles tier-ups)
-   *   - per-muscle XP and level
+   * Saves a completed workout to Firestore.
+   * Updates totalXP, tier, tierXP, tierCap, streak, and lastCompletionDate.
    * Returns the new document ID.
    */
-  export async function saveWorkout(userId: string,workout: Omit<Workout, "id" | "createdAt">): Promise<string> {
+  export async function saveWorkout(
+    userId: string,
+    workout: Omit<Workout, "id" | "createdAt">
+  ): Promise<string> {
     // Save workout document
     const workoutsRef = collection(db, "users", userId, "workouts");
     const docRef = await addDoc(workoutsRef, {
       ...workout,
       createdAt: serverTimestamp(),
     });
-  
-    // Calculate XP per muscle group from this workout
-    const muscleXP: Partial<Record<MuscleGroup, number>> = {};
-    let totalSessionXP = 0;
-  
-    for (const exercise of workout.exercises) {
-      const xp = calcXP(exercise.sets, exercise.reps, exercise.weight);
-      muscleXP[exercise.muscleGroup] = (muscleXP[exercise.muscleGroup] ?? 0) + xp;
-      totalSessionXP += xp;
-    }
-  
-    // Fetch current user data for tier calculation
+    // Update user XP, tier, streak
     const userRef = doc(db, "users", userId);
     const userSnap = await getDoc(userRef);
     const userData = userSnap.data() as UserProfile;
   
-    const { tier, tierXP, tierCap } = calcTierProgression(
-      userData.tier ?? 1,
-      userData.tierXP ?? 0,
-      totalSessionXP
-    );
+    const newTotalXP = (userData.totalXP ?? 0) + workout.xpEarned;
+    const newTier = calcTier(newTotalXP);
+    const newTierXP = calcTierXP(newTotalXP);
+    const newTierCap = TIER_THRESHOLDS[newTier];
   
-    // Update user document
     await setDoc(
       userRef,
       {
-        totalXP: increment(totalSessionXP),
-        tier,
-        tierXP,
-        tierCap,
+        totalXP: increment(workout.xpEarned),
+        tier: newTier,
+        tierXP: newTierXP,
+        tierCap: newTierCap,
+        streak: workout.streakAtTime,
+        lastCompletionDate: workout.date,
       },
       { merge: true }
     );
-  
-    // Update per-muscle XP and level
-    for (const [muscle, xp] of Object.entries(muscleXP) as [MuscleGroup, number][]) {
-      const muscleRef = doc(db, "users", userId, "muscleProgress", muscle);
-      const muscleSnap = await getDoc(muscleRef);
-      const currentMuscleXP = (muscleSnap.data()?.xp ?? 0) + xp;
-      const newMuscleLevel = calcMuscleLevel(currentMuscleXP);
-  
-      await setDoc(
-        muscleRef,
-        {
-          xp: increment(xp),
-          level: newMuscleLevel,
-          lastUpdated: serverTimestamp(),
-        },
-        { merge: true }
-      );
-    }
   
     return docRef.id;
   }
   
   /**
-   * Fetches all workouts for a user, ordered by date descending.
+   * Fetches all workouts for a user, ordered by most recent first.
    */
   export async function getWorkouts(userId: string): Promise<Workout[]> {
     const ref = collection(db, "users", userId, "workouts");
@@ -231,7 +254,6 @@ import {
     return snap.docs.map((d) => ({ id: d.id, ...d.data() } as Workout));
   }
   
-
   /**
    * Saves a goal to Firestore.
    * Returns the new document ID.
@@ -246,7 +268,7 @@ import {
   }
   
   /**
-   * Fetches all goals for a user, ordered by date descending.
+   * Fetches all goals for a user, ordered by most recent first.
    */
   export async function getGoals(userId: string): Promise<Goal[]> {
     const ref = collection(db, "users", userId, "goals");
@@ -255,19 +277,37 @@ import {
     return snap.docs.map((d) => ({ id: d.id, ...d.data() } as Goal));
   }
   
+  /**
+   * Saves updated body attribute progression to Firestore.
+   * Called after a workout is confirmed.
+   * Each attribute is a value from 0–100.
+   */
+  export async function saveBodyProgression(
+    userId: string,
+    progression: Partial<Record<BodyAttribute, number>>
+  ): Promise<void> {
+    for (const [attribute, value] of Object.entries(progression) as [BodyAttribute, number][]) {
+      const ref = doc(db, "users", userId, "bodyProgression", attribute);
+      await setDoc(
+        ref,
+        { value, level: calcMuscleLevel(value), lastUpdated: serverTimestamp() },
+        { merge: true }
+      );
+    }
+  }
   
   /**
-   * Fetches the XP and level for all muscle groups for a user.
-   * Used by the frontend to color the avatar per muscle group.
+   * Fetches body attribute progression for a user.
+   * Used by the frontend to display the Body Progression modal.
    */
-  export async function getMuscleProgress(
+  export async function getBodyProgression(
     userId: string
-  ): Promise<Partial<Record<MuscleGroup, MuscleProgress>>> {
-    const ref = collection(db, "users", userId, "muscleProgress");
+  ): Promise<Partial<Record<BodyAttribute, number>>> {
+    const ref = collection(db, "users", userId, "bodyProgression");
     const snap = await getDocs(ref);
-    const result: Partial<Record<MuscleGroup, MuscleProgress>> = {};
+    const result: Partial<Record<BodyAttribute, number>> = {};
     snap.docs.forEach((d) => {
-      result[d.id as MuscleGroup] = d.data() as MuscleProgress;
+      result[d.id as BodyAttribute] = (d.data() as BodyAttributeProgress).value;
     });
     return result;
   }
