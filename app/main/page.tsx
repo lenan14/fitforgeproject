@@ -290,8 +290,7 @@ export default function MainPage() {
     const tier = getTierFromXP(xp);
     const minXP = xpTierThresholds[tier - 1];
     const nextXP = xpTierThresholds[tier] ?? xpTierThresholds[xpTierThresholds.length - 1];
-    const cappedXP = Math.min(xp, nextXP);
-    const progress = Math.min(100, Math.floor(((cappedXP - minXP) / (nextXP - minXP)) * 100));
+    const progress = Math.min(100, Math.floor(((xp - minXP) / (nextXP - minXP)) * 100));
     return { tier, minXP, nextXP, progress };
   };
 
@@ -484,6 +483,14 @@ export default function MainPage() {
     console.log(`Added ${xpAmount} XP for testing`);
   };
 
+  // [Reset XP For Master Control] - Master Control function for testing
+  const handleResetXP = () => {
+    setTotalXP(0);
+    setStreak(0);
+    setLastCompletionDate(null);
+    console.log("XP reset for testing");
+  };
+
   useEffect(() => {
     return onAuthStateChanged(auth, async (u) => {
       if (!u) { router.push("/login"); return; }
@@ -529,81 +536,129 @@ export default function MainPage() {
 
       {/* UI - User Interface (Dropdown menus) */}
       {/* <div className="absolute top-6 left-6 z-20 flex items-center gap-12 rounded-[32px] border-[3px] border-[#d7c4b4] bg-[#f8efe4] px-4 py-3 shadow-[0_18px_45px_rgba(0,0,0,0.14)]"> */}
-      <div className="absolute top-4 left-4 right-4 z-20 flex items-center justify-between gap-16 rounded-[36px] border-2 border-[#cbb6a4] bg-[#f8efe4] px-8 py-5 shadow-[0_20px_50px_rgba(0,0,0,0.18)]">
+      <div className="absolute top-4 left-4 right-4 z-20 flex items-center justify-between rounded-[40px] bg-[#2c1f14]/80 backdrop-blur-md px-6 py-3 shadow-[0_8px_32px_rgba(0,0,0,0.3)] border border-[#ffffff15]">
 
-        {/* Profile */}
-        <div className="relative">
-          <button
-            onClick={() => toggle("avatar")}
-            className="flex items-center gap-3 rounded-[22px] bg-white border border-[#d7c4b4] px-4 py-2 text-sm font-semibold text-[#5b4636] shadow-sm hover:bg-[#f3e1d3] transition-all duration-200 active:scale-[0.98]"
-          >
-            <span className="flex h-10 w-10 items-center justify-center rounded-full bg-[#f3e1d3] text-lg text-[#5b4636]">🙂</span>
-            <span>Profile</span>
-            <span className="text-[10px]">{openMenu === "avatar" ? "▲" : "▼"}</span>
-          </button>
+      {/* Left — Profile */}
+      <div className="relative">
+        <button
+          onClick={() => toggle("avatar")}
+          className="flex items-center gap-2 rounded-full bg-[#f5e6d3] px-4 py-2 text-sm font-bold text-[#2c1f14] hover:bg-[#edd9c0] transition-all duration-200 shadow-md"
+        >
+          <span className="text-base">🧍</span>
+          <span>Profile</span>
+          <span className="text-[9px] opacity-60">{openMenu === "avatar" ? "▲" : "▼"}</span>
+        </button>
 
-          {openMenu === "avatar" && (
-            <div className="absolute left-0 mt-3 w-64 rounded-2xl bg-white border border-[#d7c4b4] shadow-[0_10px_30px_rgba(0,0,0,0.12)] p-2">
-
-              {[
-                { label: "Stats", action: handleStatsPopUp, icon: "📊" },
-                { label: "Tasks", action: handleTasksPopUp, icon: "📋" },
-                { label: "Body Progression", action: handleBodyProgressionPopUp, icon: "💪" },
-              ].map((item) => (
-                <button
-                  key={item.label}
-                  onClick={item.action}
-                  className="w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-[#5b4636] font-semibold hover:bg-[#f3e1d3] transition-all duration-150 active:scale-[0.98]"
-                >
-                  <span className="text-lg opacity-80">{item.icon}</span>
-                  {item.label}
-                </button>
-              ))}
-
-              <div className="h-px bg-[#e2d5c8] my-2" />
-
+        {openMenu === "avatar" && (
+          <div className="absolute left-0 mt-3 w-56 rounded-2xl bg-[#2c1f14] border border-[#ffffff15] shadow-[0_16px_40px_rgba(0,0,0,0.4)] overflow-hidden">
+            {[
+              { label: "Stats", action: handleStatsPopUp, icon: "📊" },
+              { label: "Tasks", action: handleTasksPopUp, icon: "📋" },
+              { label: "Body Progression", action: handleBodyProgressionPopUp, icon: "💪" },
+            ].map((item) => (
               <button
-                onClick={handleSignOut}
-                className="w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-[#7a2e2e] font-semibold hover:bg-[#f8d7d7] transition-all duration-150 active:scale-[0.98]"
+                key={item.label}
+                onClick={item.action}
+                className="w-full flex items-center gap-3 px-5 py-3 text-white text-sm font-semibold hover:bg-[#ffffff10] transition-colors duration-150"
               >
-                <span className="text-lg opacity-80">🚪</span>
-                Log Out
+                <span>{item.icon}</span>
+                {item.label}
               </button>
+            ))}
+            <div className="h-px bg-[#ffffff15] mx-4" />
+            <button
+              onClick={handleSignOut}
+              className="w-full flex items-center gap-3 px-5 py-3 text-[#ff8a80] text-sm font-semibold hover:bg-[#ffffff10] transition-colors duration-150"
+            >
+              <span>🚪</span>
+              Log Out
+            </button>
+          </div>
+        )}
+      </div>
 
-            </div>
-          )}
-        </div>  
+      {/* Center — Tier Progress */}
+      <div className="flex flex-col items-center gap-1 min-w-[260px]">
+        <span className="text-[#f0d5be] text-xs font-bold tracking-widest uppercase opacity-80">
+          {tierName} — Tier {tierInfo.tier}
+        </span>
+
+        {/* XP labels */}
+        <div className="flex justify-between w-full" style={{ paddingLeft: "8px", paddingRight: "8px" }}>
+          <span className="text-[#f0d5be] text-xs font-bold">{totalXP} XP</span>
+          <span className="text-[#f0d5be] text-xs font-bold">{tierInfo.nextXP} XP</span>
+        </div>
+
+        {/* Progress bar outer track */}
+        <div 
+          className="w-full rounded-full"
+          style={{ 
+            height: "24px",
+            background: "rgba(0,0,0,0.3)", 
+            border: "2px solid rgba(255,255,255,0.2)",
+            padding: "3px",
+          }}
+        >
+          {/* Outer fill */}
+          <div
+            style={{
+              height: "100%",
+              width: `${tierInfo.progress}%`,
+              borderRadius: "999px",
+              background: "linear-gradient(90deg, #e8937a, #f0c9a0)",
+              boxShadow: "0 0 12px rgba(232,147,122,0.7)",
+              transition: "width 0.8s ease",
+              padding: "3px",
+              display: "flex",
+              alignItems: "center",
+            }}
+          >
+            {/* Inner bar */}
+            <div
+              style={{
+                height: "60%",
+                width: "100%",
+                borderRadius: "999px",
+                background: "rgba(255,255,255,0.5)",
+                transition: "width 0.8s ease",
+              }}
+            />
+          </div>
+        </div>
+
+        {streak > 0 && (
+          <span className="text-[#ffb347] text-xs font-bold">🔥 {streak} day streak</span>
+        )}
+      </div>
+
+      {/* Right — Workouts + Master Control */}
+      <div className="flex items-center gap-3">
 
         {/* Workouts */}
         <div className="relative">
           <button
             onClick={() => toggle("workouts")}
-            className="flex items-center gap-2 rounded-[22px] bg-white border border-[#d7c4b4] px-4 py-2 text-sm font-semibold text-[#5b4636] shadow-sm hover:bg-[#f3e1d3] transition-all duration-200 active:scale-[0.98]"
+            className="flex items-center gap-2 rounded-full bg-[#f5e6d3] px-4 py-2 text-sm font-bold text-[#2c1f14] hover:bg-[#edd9c0] transition-all duration-200 shadow-md"
           >
-            <span className="text-lg">🏋️</span>
+            <span className="text-base">🏋️</span>
             <span>Workouts</span>
-            <span className="text-[10px]">{openMenu === "workouts" ? "▲" : "▼"}</span>
+            <span className="text-[9px] opacity-60">{openMenu === "workouts" ? "▲" : "▼"}</span>
           </button>
 
           {openMenu === "workouts" && (
-            <div className="absolute left-0 mt-3 w-56 rounded-2xl bg-white border border-[#d7c4b4] shadow-[0_10px_30px_rgba(0,0,0,0.12)] p-2">
-
+            <div className="absolute right-0 mt-3 w-52 rounded-2xl bg-[#2c1f14] border border-[#ffffff15] shadow-[0_16px_40px_rgba(0,0,0,0.4)] overflow-hidden">
               <button
                 onClick={handleUpperPopUp}
-                className="w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-[#5b4636] font-semibold hover:bg-[#f3e1d3] transition-all duration-150 active:scale-[0.98]"
+                className="w-full flex items-center gap-3 px-5 py-3 text-white text-sm font-semibold hover:bg-[#ffffff10] transition-colors duration-150"
               >
-                <span className="text-lg opacity-80">💪</span>
-                Upper Body
+                <span>💪</span> Upper Body
               </button>
-
               <button
                 onClick={handleLowerPopUp}
-                className="w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-[#5b4636] font-semibold hover:bg-[#f3e1d3] transition-all duration-150 active:scale-[0.98]"
+                className="w-full flex items-center gap-3 px-5 py-3 text-white text-sm font-semibold hover:bg-[#ffffff10] transition-colors duration-150"
               >
-                <span className="text-lg opacity-80">🦵</span>
-                Lower Body
+                <span>🦵</span> Lower Body
               </button>
-
             </div>
           )}
         </div>
@@ -612,59 +667,51 @@ export default function MainPage() {
         <div className="relative">
           <button
             onClick={() => toggle("master")}
-            className="flex items-center gap-2 rounded-[22px] bg-white border border-[#d7c4b4] px-4 py-2 text-sm font-semibold text-[#5b4636] shadow-sm hover:bg-[#f3e1d3] transition-all duration-200 active:scale-[0.98]"
+            className="flex items-center gap-2 rounded-full bg-[#ffffff15] px-4 py-2 text-sm font-bold text-[#f5e6d3] hover:bg-[#ffffff25] transition-all duration-200"
           >
-            <span className="text-lg">🧠</span>
-            <span>Master Control</span>
-            <span className="text-[10px]">{openMenu === "master" ? "▲" : "▼"}</span>
+            <span className="text-base">🧠</span>
+            <span className="text-[9px] opacity-60">{openMenu === "master" ? "▲" : "▼"}</span>
           </button>
 
           {openMenu === "master" && (
-            <div className="absolute left-0 mt-3 w-56 rounded-2xl bg-white border border-[#d7c4b4] shadow-[0_10px_30px_rgba(0,0,0,0.12)] p-2">
-
-              <div className="px-4 py-2 text-sm font-semibold text-[#5b4636]">
-                Add XP (Testing)
-              </div>
-
+            <div className="absolute right-0 mt-3 w-52 rounded-2xl bg-[#2c1f14] border border-[#ffffff15] shadow-[0_16px_40px_rgba(0,0,0,0.4)] overflow-hidden">
+              <div className="px-5 py-2 text-[#f5e6d3] text-xs font-bold opacity-50 uppercase tracking-widest">Add XP (Testing)</div>
               {[100, 500, 1000, 5000].map((xp) => (
                 <button
                   key={xp}
                   onClick={() => handleAddXP(xp)}
-                  className="w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-[#5b4636] font-semibold hover:bg-[#f3e1d3] transition-all duration-150 active:scale-[0.98]"
+                  className="w-full flex items-center gap-3 px-5 py-3 text-white text-sm font-semibold hover:bg-[#ffffff10] transition-colors duration-150"
                 >
-                  <span className="text-lg opacity-80">⭐</span>
-                  +{xp} XP
+                  <span>⭐</span> +{xp} XP
                 </button>
               ))}
-
+              <div className="h-px bg-[#ffffff15] mx-4" />
+          <button
+            onClick={handleResetXP}
+            className="w-full flex items-center gap-3 px-5 py-3 text-[#ff8a80] text-sm font-semibold hover:bg-[#ffffff10] transition-colors duration-150"
+          >
+            <span>🔄</span> Reset XP
+          </button>
             </div>
           )}
         </div>
 
-        {/* Tier Progression Level */}
-        <div className="flex min-w-[300px] max-w-[520px] flex-col rounded-[24px] bg-white border border-[#d7c4b4] p-3 shadow-sm">
-          <div className="flex items-center gap-3">
-            <span className="text-2xl font-bold text-[#5b4636]">⭐</span>
-            <span className="text-sm font-semibold text-[#5b4636]"> ({tierName})  Tier {tierInfo.tier}: XP {totalXP} / {tierInfo.nextXP} {streak} Streak</span>
-          </div>
-          <div className="mt-3 h-3 w-full overflow-hidden rounded-full bg-[#d6c3b5]">
-            <div
-              className="h-full bg-[#c89f7a] rounded-full transition-all duration-500"
-              style={{ width: `${tierInfo.progress}%` }}
-            />
-          </div>
-        </div>
-
       </div>
+    </div>
 
 
       {/* Center avatar */}
-      <div className="relative z-10 flex min-h-screen items-center justify-center px-6 py-10">
-        {/* IMPORTANT: Avatar changes based on the User's Tier */}
+      <div className="relative z-10 flex min-h-screen items-center justify-center">
         <img
           src={avatarSrc}
           alt={`User avatar tier ${tierInfo.tier}`}
-          className="w-[300px] scale-[3] max-w-none rounded-full object-cover translate-y-80"
+          className="w-[150px] scale-[3] max-w-none object-cover"
+          style={{
+            position: "absolute",
+            bottom: "40%",
+            left: "53.5%",
+            transform: "translateX(-50%) scale(3)",
+          }}
         />
       </div>
 
@@ -827,7 +874,7 @@ export default function MainPage() {
               <label style={{ display: "flex", flexDirection: "column", gap: "8px", fontWeight: 700, color: "#0f172a" }}>
                 Weight (Equipment)
                 <input
-                  type="text"
+                  type="number"
                   value={weight}
                   onChange={(event) => setWeight(event.target.value)}
                   disabled={equipmentType !== "equipment"}
