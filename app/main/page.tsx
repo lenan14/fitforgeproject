@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { onAuthStateChanged, signOut } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import { useRouter } from "next/navigation";
-import { saveWorkout, saveBodyProgression, getUserProfile, getBodyProgression } from "@/lib/firestore";
+import { saveWorkout, saveBodyProgression, getUserProfile, getBodyProgression, saveTaskList, getTaskList } from "@/lib/firestore";
 
 const upperWorkoutOptions = {
   noEquipment: [
@@ -27,7 +27,7 @@ const lowerWorkoutOptions = {
     "Squats",
     "Lunges",
     "Jump Squats",
-    "Wall Sit",
+    "Box Jumps",
     "Calf Raises",
   ],
   equipment: [
@@ -40,26 +40,26 @@ const lowerWorkoutOptions = {
 };
 
 const workoutXPConfig: Record<string, { baseMultiplier: number; weightMultiplier?: number }> = {
-  "Push-Ups": { baseMultiplier: 2 },
-  "Diamond Push-Ups": { baseMultiplier: 2.2 },
-  "Pike Push-Ups": { baseMultiplier: 2 },
-  "Plank Shoulder Taps": { baseMultiplier: 1.8 },
-  "Pull-Ups": { baseMultiplier: 2.5 },
-  "Bench Press": { baseMultiplier: 1, weightMultiplier: 0.05 },
-  "One-Arm Dumbbell Row": { baseMultiplier: 1, weightMultiplier: 0.05 },
-  "Shoulder Press": { baseMultiplier: 1, weightMultiplier: 0.05 },
-  "Bicep Curls": { baseMultiplier: 1, weightMultiplier: 0.05 },
-  "Tricep Dips": { baseMultiplier: 1.2, weightMultiplier: 0.03 },
-  "Squats": { baseMultiplier: 2 },
-  "Lunges": { baseMultiplier: 2 },
-  "Jump Squats": { baseMultiplier: 2.4 },
-  "Wall Sit": { baseMultiplier: 1.5 },
-  "Calf Raises": { baseMultiplier: 1.6 },
-  "Barbell Squat": { baseMultiplier: 1, weightMultiplier: 0.05 },
-  "Deadlift": { baseMultiplier: 1, weightMultiplier: 0.06 },
-  "Leg Press": { baseMultiplier: 1, weightMultiplier: 0.05 },
-  "Romanian Deadlift": { baseMultiplier: 1, weightMultiplier: 0.05 },
-  "Weighted Lunges": { baseMultiplier: 1, weightMultiplier: 0.05 },
+  "Push-Ups":              { baseMultiplier: 0.5 },
+  "Diamond Push-Ups":      { baseMultiplier: 0.55 },
+  "Pike Push-Ups":         { baseMultiplier: 0.5 },
+  "Plank Shoulder Taps":   { baseMultiplier: 0.45 },
+  "Pull-Ups":              { baseMultiplier: 0.6 },
+  "Bench Press":           { baseMultiplier: 1, weightMultiplier: 0.01 },
+  "One-Arm Dumbbell Row":  { baseMultiplier: 1, weightMultiplier: 0.01 },
+  "Shoulder Press":        { baseMultiplier: 1, weightMultiplier: 0.01 },
+  "Bicep Curls":           { baseMultiplier: 1, weightMultiplier: 0.01 },
+  "Tricep Dips":           { baseMultiplier: 0.3, weightMultiplier: 0.008 },
+  "Squats":                { baseMultiplier: 0.5 },
+  "Lunges":                { baseMultiplier: 0.5 },
+  "Jump Squats":           { baseMultiplier: 0.6 },
+  "Box Jumps":              { baseMultiplier: 0.4 },
+  "Calf Raises":           { baseMultiplier: 0.4 },
+  "Barbell Squat":         { baseMultiplier: 1, weightMultiplier: 0.01 },
+  "Deadlift":              { baseMultiplier: 1, weightMultiplier: 0.012 },
+  "Leg Press":             { baseMultiplier: 1, weightMultiplier: 0.01 },
+  "Romanian Deadlift":     { baseMultiplier: 1, weightMultiplier: 0.01 },
+  "Weighted Lunges":       { baseMultiplier: 1, weightMultiplier: 0.01 },
 };
 
 const workoutStatImpact: Record<
@@ -83,7 +83,7 @@ const workoutStatImpact: Record<
   "Squats": { strength: 2.3, endurance: 1.0, muscles: ["Quads", "Glutes"] },
   "Lunges": { strength: 2.1, endurance: 1.1, muscles: ["Quads", "Glutes"] },
   "Jump Squats": { strength: 2.2, endurance: 1.2, muscles: ["Quads", "Glutes"] },
-  "Wall Sit": { strength: 1.0, endurance: 1.8, muscles: ["Quads", "Glutes"] },
+  "Box Jumps": { strength: 1.0, endurance: 1.8, muscles: ["Quads", "Glutes"] },
   "Calf Raises": { strength: 1.7, endurance: 1.0, muscles: ["Calves"] },
   "Barbell Squat": { strength: 2.6, endurance: 0.9, muscles: ["Quads", "Glutes", "Core"] },
   "Deadlift": { strength: 2.8, endurance: 0.9, muscles: ["Glutes", "Hamstrings", "Back"] },
@@ -123,6 +123,7 @@ export default function MainPage() {
   const [lastCompletionDate, setLastCompletionDate] = useState<string | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [savedBodyProgression, setSavedBodyProgression] = useState<Record<string, number>>({});
 
   // [Sign out Function] //
   const handleSignOut = async () => {
@@ -326,16 +327,16 @@ export default function MainPage() {
   // [Body Attribute Progress]
   const calculateBodyAttributeProgression = (tasks: WorkoutTask[]) => {
     const progression: Record<string, number> = {
-      Chest: 10,
-      Shoulders: 10,
-      Arms: 10,
-      Back: 10,
-      Quads: 10,
-      Hamstrings: 10,
-      Glutes: 10,
-      Calves: 10,
-      Core: 10,
-      Abs: 10,
+      Chest: savedBodyProgression.Chest ?? 10,
+      Shoulders: savedBodyProgression.Shoulders ?? 10,
+      Arms: savedBodyProgression.Arms ?? 10,
+      Back: savedBodyProgression.Back ?? 10,
+      Quads: savedBodyProgression.Quads ?? 10,
+      Hamstrings: savedBodyProgression.Hamstrings ?? 10,
+      Glutes: savedBodyProgression.Glutes ?? 10,
+      Calves: savedBodyProgression.Calves ?? 10,
+      Core: savedBodyProgression.Core ?? 10,
+      Abs: savedBodyProgression.Abs ?? 10,
     };
 
     const completedTasks = tasks.filter((task) => task.status === "completed");
@@ -459,6 +460,12 @@ export default function MainPage() {
     return () => clearInterval(interval);
   }, []);
 
+  useEffect(() => {
+    if (userId && tasks.length > 0) {
+      saveTaskList(userId, tasks).catch(console.error);
+    }
+  }, [tasks, userId]);
+
   // [Stat Modal Handler]
   const handleStatsPopUp = async () => {
     setOpenMenu(null);
@@ -502,7 +509,14 @@ export default function MainPage() {
           setStreak(profile.streak ?? 0);
           setLastCompletionDate(profile.lastCompletionDate ?? null);
         }
-        await getBodyProgression(u.uid);
+        const progression = await getBodyProgression(u.uid);
+        if (progression) {
+          setSavedBodyProgression(progression as Record<string, number>);
+        }
+        const taskList = await getTaskList(u.uid);
+        if (taskList.length > 0) {
+          setTasks(taskList as WorkoutTask[]);
+        }
       } catch (error) {
         console.error("Failed to load user data:", error);
       } finally {
