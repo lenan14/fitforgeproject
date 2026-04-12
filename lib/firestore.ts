@@ -95,26 +95,26 @@ import {
   };
   
   export const WORKOUT_XP_CONFIG: Record<string, { baseMultiplier: number; weightMultiplier?: number }> = {
-    "Push-Ups":              { baseMultiplier: 2 },
-    "Diamond Push-Ups":      { baseMultiplier: 2.2 },
-    "Pike Push-Ups":         { baseMultiplier: 2 },
-    "Plank Shoulder Taps":   { baseMultiplier: 1.8 },
-    "Pull-Ups":              { baseMultiplier: 2.5 },
-    "Bench Press":           { baseMultiplier: 1, weightMultiplier: 0.05 },
-    "One-Arm Dumbbell Row":  { baseMultiplier: 1, weightMultiplier: 0.05 },
-    "Shoulder Press":        { baseMultiplier: 1, weightMultiplier: 0.05 },
-    "Bicep Curls":           { baseMultiplier: 1, weightMultiplier: 0.05 },
-    "Tricep Dips":           { baseMultiplier: 1.2, weightMultiplier: 0.03 },
-    "Squats":                { baseMultiplier: 2 },
-    "Lunges":                { baseMultiplier: 2 },
-    "Jump Squats":           { baseMultiplier: 2.4 },
-    "Wall Sit":              { baseMultiplier: 1.5 },
-    "Calf Raises":           { baseMultiplier: 1.6 },
-    "Barbell Squat":         { baseMultiplier: 1, weightMultiplier: 0.05 },
-    "Deadlift":              { baseMultiplier: 1, weightMultiplier: 0.06 },
-    "Leg Press":             { baseMultiplier: 1, weightMultiplier: 0.05 },
-    "Romanian Deadlift":     { baseMultiplier: 1, weightMultiplier: 0.05 },
-    "Weighted Lunges":       { baseMultiplier: 1, weightMultiplier: 0.05 },
+    "Push-Ups":              { baseMultiplier: 0.5 },
+    "Diamond Push-Ups":      { baseMultiplier: 0.55 },
+    "Pike Push-Ups":         { baseMultiplier: 0.5 },
+    "Plank Shoulder Taps":   { baseMultiplier: 0.45 },
+    "Pull-Ups":              { baseMultiplier: 0.6 },
+    "Bench Press":           { baseMultiplier: 1, weightMultiplier: 0.01 },
+    "One-Arm Dumbbell Row":  { baseMultiplier: 1, weightMultiplier: 0.01 },
+    "Shoulder Press":        { baseMultiplier: 1, weightMultiplier: 0.01 },
+    "Bicep Curls":           { baseMultiplier: 1, weightMultiplier: 0.01 },
+    "Tricep Dips":           { baseMultiplier: 0.3, weightMultiplier: 0.008 },
+    "Squats":                { baseMultiplier: 0.5 },
+    "Lunges":                { baseMultiplier: 0.5 },
+    "Jump Squats":           { baseMultiplier: 0.6 },
+    "Box Jumps":              { baseMultiplier: 0.4 },
+    "Calf Raises":           { baseMultiplier: 0.4 },
+    "Barbell Squat":         { baseMultiplier: 1, weightMultiplier: 0.01 },
+    "Deadlift":              { baseMultiplier: 1, weightMultiplier: 0.012 },
+    "Leg Press":             { baseMultiplier: 1, weightMultiplier: 0.01 },
+    "Romanian Deadlift":     { baseMultiplier: 1, weightMultiplier: 0.01 },
+    "Weighted Lunges":       { baseMultiplier: 1, weightMultiplier: 0.01 },
   };
   
   /**
@@ -178,9 +178,11 @@ import {
     profile: Pick<UserProfile, "name" | "email">
   ): Promise<void> {
     const ref = doc(db, "users", userId);
-    await setDoc(
-      ref,
-      {
+    const snap = await getDoc(ref);
+  
+    if (!snap.exists()) {
+      // First time login — create fresh profile
+      await setDoc(ref, {
         ...profile,
         totalXP: 0,
         tier: 1,
@@ -189,9 +191,11 @@ import {
         streak: 0,
         lastCompletionDate: null,
         createdAt: serverTimestamp(),
-      },
-      { merge: true }
-    );
+      });
+    } else {
+      // Returning user — only update name and email
+      await setDoc(ref, { ...profile }, { merge: true });
+    }
   }
   
   /**
@@ -310,4 +314,24 @@ import {
       result[d.id as BodyAttribute] = (d.data() as BodyAttributeProgress).value;
     });
     return result;
+  }
+  /**
+  * Saves the full task list to Firestore.
+  * Overwrites the entire task list each time.
+  */
+  export async function saveTaskList(
+      userId: string,
+      tasks: unknown[]
+    ): Promise<void> {
+      const ref = doc(db, "users", userId, "taskList", "current");
+      await setDoc(ref, { tasks, lastUpdated: serverTimestamp() });
+  }
+  
+  /**
+   * Fetches the task list for a user.
+   */
+  export async function getTaskList(userId: string): Promise<unknown[]> {
+    const ref = doc(db, "users", userId, "taskList", "current");
+    const snap = await getDoc(ref);
+    return snap.exists() ? (snap.data().tasks ?? []) : [];
   }
