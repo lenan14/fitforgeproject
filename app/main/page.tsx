@@ -1262,8 +1262,8 @@ export default function MainPage() {
                         </div>
                         <div style={{ fontSize: "13px", color: "#475569", marginBottom: "8px" }}>
                           <div>Min required: <span style={{ fontWeight: 700 }}>{minimumTime} min</span></div>
-                          <div>Elapsed: <span style={{ fontWeight: 700, color: canConfirm ? "#16a34a" : "#dc2626" }}>
-                            {canConfirm ? "Ready ✓" : `${elapsedTime} min`}
+                          <div>Elapsed: <span style={{ fontWeight: 700, color: task.status === "completed" ? "#16a34a" : canConfirm ? "#16a34a" : "#dc2626" }}>
+                            {task.status === "completed" ? "Done ✓" : canConfirm ? "Ready ✓" : `${elapsedTime} min`}
                           </span></div>
                         </div>
                         {!canConfirm && task.status === "pending" && (
@@ -1307,7 +1307,7 @@ export default function MainPage() {
                             cursor: canConfirm ? "pointer" : "not-allowed",
                           }}
                         >
-                          {task.status === "completed" ? "✓ Done" : "Confirm"}
+                          {task.status === "completed" ? "Done ✓" : "Confirm"}
                         </button>
                       </div>
                     </div>
