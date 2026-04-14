@@ -630,8 +630,8 @@ export default function MainPage() {
   const handleFitzyDismiss = () => {
     if (isGreetingMessage) {
       setIsGreetingMessage(false);
-      setFitzyExpression("questioning");
-      setFitzyMessage("By the way, hit Goals at the bottom to set a fitness goal! I'll give you recommended exercises and if you log it, personalized advice!");
+      setFitzyExpression("happy");
+      setFitzyMessage("By the way, hit Goals at the bottom to set a fitness goal! I'll give you recommended exercises, and if you log it, personalized advice too!");
     } else {
       setFitzyBubbleVisible(false);
     }
