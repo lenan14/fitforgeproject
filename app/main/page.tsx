@@ -1,9 +1,9 @@
 'use client';
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { onAuthStateChanged, signOut } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import { useRouter } from "next/navigation";
-import { saveWorkout, saveBodyProgression, getUserProfile, getBodyProgression, saveTaskList, getTaskList } from "@/lib/firestore";
+import { saveWorkout, saveBodyProgression, getUserProfile, getBodyProgression, saveTaskList, getTaskList, saveGoal, getGoals, Goal } from "@/lib/firestore";
 
 const upperWorkoutOptions = {
   noEquipment: [
@@ -92,6 +92,65 @@ const workoutStatImpact: Record<
   "Weighted Lunges": { strength: 2.3, endurance: 1.0, muscles: ["Quads", "Glutes"] },
 };
 
+const fitzyTips: Record<string, string> = {
+  "Push-Ups": "Tip: Core tight, elbows at 45°. Don't let your hips sag!",
+  "Diamond Push-Ups": "Tip: Hands close together, it's great for tricep isolation!",
+  "Pike Push-Ups": "Tip: Keep your hips high to load those shoulders!",
+  "Plank Shoulder Taps": "Tip: Minimize hip rotation, stability is the whole point.",
+  "Pull-Ups": "Tip: Full dead hang at the bottom, chin over bar at the top!",
+  "Bench Press": "Tip: Feet flat, slight arch, bar to lower chest. Control the descent!",
+  "One-Arm Dumbbell Row": "Tip: Brace your core and row to your hip, not your armpit.",
+  "Shoulder Press": "Tip: Don't lock out at the top, keep tension on the delts.",
+  "Bicep Curls": "Tip: Elbows pinned to your sides. Full range of motion!",
+  "Tricep Dips": "Tip: Lean slightly forward to hit triceps, not shoulders.",
+  "Squats": "Tip: Chest up, knees tracking toes. Hit parallel or below!",
+  "Lunges": "Tip: Back knee nearly touches the floor, big range wins.",
+  "Jump Squats": "Tip: Land softly! Absorb force through your hips and knees.",
+  "Box Jumps": "Tip: Land quietly, that's muscle doing work, not bone.",
+  "Calf Raises": "Tip: Pause at the top and feel the burn. Slow it down!",
+  "Barbell Squat": "Tip: Bar on your traps, brace your core. Break at the hips first.",
+  "Deadlift": "Tip: Hinge, don't squat. Bar stays close to your legs the whole way.",
+  "Leg Press": "Tip: Don't lock your knees at the top, keep them soft.",
+  "Romanian Deadlift": "Tip: Feel the hamstring stretch at the bottom, that's the whole exercise.",
+  "Weighted Lunges": "Tip: Keep your torso upright. Front knee doesn't pass your toes.",
+};
+
+type GoalSuggestion = {
+  tip: string;
+  exercises: string[];
+};
+
+function generateGoalSuggestion(goalText: string): GoalSuggestion | null {
+  const t = goalText.toLowerCase();
+  if (t.match(/\b(arm|arms|bicep|biceps|tricep|triceps|guns)\b/))
+    return { tip: "Mix pulling moves with isolation work, hit arms 2-3x a week for best results!", exercises: ["Bicep Curls", "Tricep Dips", "Diamond Push-Ups", "Pull-Ups"] };
+  if (t.match(/\b(chest|pec|pecs|bench)\b/))
+    return { tip: "Compound pressing + isolation = chest gains. Keep reps in the 8-12 range!", exercises: ["Bench Press", "Push-Ups", "Diamond Push-Ups"] };
+  if (t.match(/\b(back|lats|lat|row)\b/))
+    return { tip: "A strong back means better posture and more power everywhere. Pull-Ups are king!", exercises: ["Pull-Ups", "One-Arm Dumbbell Row", "Deadlift"] };
+  if (t.match(/\b(shoulder|shoulders|delt|delts|boulder)\b/))
+    return { tip: "Hit all three delt heads, press for front, rows for rear. Shoulders love volume!", exercises: ["Shoulder Press", "Pike Push-Ups", "Plank Shoulder Taps"] };
+  if (t.match(/\b(leg|legs|quad|quads|lower body)\b/))
+    return { tip: "Legs are your biggest muscle group, train them hard and recover harder!", exercises: ["Barbell Squat", "Squats", "Leg Press", "Jump Squats"] };
+  if (t.match(/\b(glute|glutes|butt|booty|hip|hips)\b/))
+    return { tip: "Glutes respond best to hip-hinge movements. Drive through your heels on every rep!", exercises: ["Romanian Deadlift", "Barbell Squat", "Lunges", "Weighted Lunges"] };
+  if (t.match(/\b(hamstring|hamstrings|deadlift)\b/))
+    return { tip: "Hamstrings are often undertrained. Slow the eccentric phase down for max gains!", exercises: ["Romanian Deadlift", "Deadlift", "Weighted Lunges"] };
+  if (t.match(/\b(core|abs|ab|stomach|six.?pack|waist)\b/))
+    return { tip: "Abs are built in the kitchen and the gym. Compound lifts + direct core work = the combo!", exercises: ["Plank Shoulder Taps", "Pike Push-Ups", "Barbell Squat", "Deadlift"] };
+  if (t.match(/\b(calf|calves)\b/))
+    return { tip: "Calves are stubborn, hit them with high volume and slow, controlled reps!", exercises: ["Calf Raises"] };
+  if (t.match(/\b(weight loss|lose weight|fat|burn|cardio|slim|lean|endurance|run|running|stamina)\b/))
+    return { tip: "Explosive movements burn the most calories. Combine strength training with high-rep circuits!", exercises: ["Jump Squats", "Box Jumps", "Lunges", "Push-Ups", "Squats"] };
+  if (t.match(/\b(strong|strength|power|powerful|lift more|heavier)\b/))
+    return { tip: "Train in the 3-6 rep range with heavy compound lifts. Progressive overload is everything!", exercises: ["Deadlift", "Barbell Squat", "Bench Press", "Pull-Ups"] };
+  if (t.match(/\b(muscle|bulk|gain|gains|size|bigger|build|mass)\b/))
+    return { tip: "For muscle growth, aim for 8-12 reps per set and eat in a slight calorie surplus!", exercises: ["Bench Press", "Barbell Squat", "Deadlift", "Pull-Ups", "Shoulder Press"] };
+  if (t.match(/\b(tone|toned|toning|definition|defined|cut|shred)\b/))
+    return { tip: "Toning = muscle + lower body fat. Higher reps, shorter rest, and stay consistent!", exercises: ["Push-Ups", "Squats", "Lunges", "Plank Shoulder Taps", "Jump Squats"] };
+  return null;
+}
+
 type WorkoutTask = {
   id: string;
   category: "upper" | "lower";
@@ -124,6 +183,17 @@ export default function MainPage() {
   const [userId, setUserId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [savedBodyProgression, setSavedBodyProgression] = useState<Record<string, number>>({});
+
+  // Fitzy state
+  const [fitzyExpression, setFitzyExpression] = useState<"wave" | "happy" | "questioning">("wave");
+  const [fitzyMessage, setFitzyMessage] = useState("Hey! What are we training today?");
+  const [fitzyBubbleVisible, setFitzyBubbleVisible] = useState(false);
+  const [isGreetingMessage, setIsGreetingMessage] = useState(false);
+  const [openGoalsPanel, setOpenGoalsPanel] = useState(false);
+  const [goals, setGoals] = useState<Goal[]>([]);
+  const [goalSuggestions, setGoalSuggestions] = useState<Record<string, GoalSuggestion>>({});
+  const [newGoalText, setNewGoalText] = useState("");
+  const hasShownGreeting = useRef(false);
 
   // [Sign out Function] //
   const handleSignOut = async () => {
@@ -420,7 +490,10 @@ export default function MainPage() {
     const isYesterday = lastDate && new Date(today.getFullYear(), today.getMonth(), today.getDate() - 1).toDateString() === lastDate.toDateString();
     const newStreak = isSameDay ? streak : isYesterday ? streak + 1 : 1;
     const earnedXP = calculateXPFromTask(task, newStreak);
- 
+
+    const oldTier = getTierFromXP(totalXP);
+    const newTier = getTierFromXP(totalXP + earnedXP);
+
     // Update local state
     const updatedTasks = tasks.map((t) =>
       t.id === task.id ? { ...t, status: "completed" as const, xpEarned: earnedXP } : t
@@ -429,6 +502,19 @@ export default function MainPage() {
     setTotalXP((prev) => prev + earnedXP);
     setStreak(newStreak);
     setLastCompletionDate(today.toISOString());
+
+    // Fitzy reaction
+    if (newTier > oldTier) {
+      setFitzyExpression("happy");
+      setFitzyMessage(`Awesome! You hit Tier ${newTier} - ${getTierName(newTier)}! 🎉`);
+    } else if (newStreak >= 3 && newStreak % 3 === 0) {
+      setFitzyExpression("happy");
+      setFitzyMessage(`${newStreak}-day streak! You're unstoppable! Keep those goals in sight!`);
+    } else {
+      setFitzyExpression("happy");
+      setFitzyMessage(`+${earnedXP} XP from ${task.workout}! Looking strong!`);
+    }
+    setFitzyBubbleVisible(true);
  
     // Save to Firestore
     if (userId) {
@@ -460,6 +546,51 @@ export default function MainPage() {
     return () => clearInterval(interval);
   }, []);
 
+  // Fitzy greeting - loading message while data fetches, intro once it's ready
+  useEffect(() => {
+    if (!userId) return;
+
+    if (isLoading) {
+      // Show Fitzy waving while Firebase data loads
+      setFitzyExpression("wave");
+      setFitzyMessage("Fetching your progress... one sec!");
+      setFitzyBubbleVisible(true);
+      return;
+    }
+
+    // Data is ready - show the intro once per session
+    if (!hasShownGreeting.current) {
+      hasShownGreeting.current = true;
+      const hour = new Date().getHours();
+      const timeGreeting = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
+
+      if (totalXP === 0) {
+        // Brand new user - intro + point to Workouts button
+        setFitzyExpression("wave");
+        setFitzyMessage("Hi! I'm Fitzy, your fitness buddy! Hit the Workouts dropdown up top to log your first exercise. I'll be right here cheering!");
+      } else if (streak >= 3) {
+        // Returning user on a streak - hype + nudge to Workouts
+        setFitzyExpression("happy");
+        setFitzyMessage(`${timeGreeting}! That ${streak}-day streak is on fire! Hit Workouts up top when you're ready to keep it going!`);
+      } else {
+        // Regular returning user - friendly nudge toward Workouts
+        setFitzyExpression("wave");
+        setFitzyMessage(`${timeGreeting}! Fitzy is glad to see you! Tap Workouts up top to start logging, I'll track every rep!`);
+      }
+      setFitzyBubbleVisible(true);
+      setIsGreetingMessage(true);
+    }
+  }, [isLoading, userId, streak, totalXP]);
+
+  // Fitzy form tip - fires when user picks an exercise in the workout modal
+  useEffect(() => {
+    if (selectedWorkout && fitzyTips[selectedWorkout]) {
+      setFitzyExpression("happy");
+      setFitzyMessage(fitzyTips[selectedWorkout]);
+      setFitzyBubbleVisible(true);
+    }
+  }, [selectedWorkout]);
+
   useEffect(() => {
     if (userId && tasks.length > 0) {
       saveTaskList(userId, tasks).catch(console.error);
@@ -473,6 +604,37 @@ export default function MainPage() {
     setOpenTasksModal(false);
     setOpenBodyProgressionModal(false);
     setOpenStatsModal(true);
+  };
+
+  // [Save Goal Handler]
+  const handleSaveGoal = async () => {
+    if (!newGoalText.trim() || !userId) return;
+    const text = newGoalText.trim();
+    try {
+      const id = await saveGoal(userId, text);
+      const newGoal = { id, text };
+      setGoals((prev) => [newGoal, ...prev]);
+      const suggestion = generateGoalSuggestion(text);
+      if (suggestion) {
+        setGoalSuggestions((prev) => ({ ...prev, [id]: suggestion }));
+      }
+      setNewGoalText("");
+      setFitzyExpression("happy");
+      setFitzyMessage(suggestion ? `Goal locked in! Click Goals to see how to get started!` : `Goal locked in: "${text}", let's make it happen!`);
+      setFitzyBubbleVisible(true);
+    } catch (error) {
+      console.error("Failed to save goal:", error);
+    }
+  };
+
+  const handleFitzyDismiss = () => {
+    if (isGreetingMessage) {
+      setIsGreetingMessage(false);
+      setFitzyExpression("questioning");
+      setFitzyMessage("By the way, hit Goals at the bottom to set a fitness goal! I'll give you recommended exercises and if you log it, personalized advice!");
+    } else {
+      setFitzyBubbleVisible(false);
+    }
   };
 
   // [Body Progression Modal Handler]
@@ -517,6 +679,15 @@ export default function MainPage() {
         if (taskList.length > 0) {
           setTasks(taskList as WorkoutTask[]);
         }
+        const userGoals = await getGoals(u.uid);
+        setGoals(userGoals);
+        const loadedSuggestions: Record<string, GoalSuggestion> = {};
+        userGoals.forEach((goal) => {
+          if (!goal.id) return;
+          const suggestion = generateGoalSuggestion(goal.text);
+          if (suggestion) loadedSuggestions[goal.id] = suggestion;
+        });
+        setGoalSuggestions(loadedSuggestions);
       } catch (error) {
         console.error("Failed to load user data:", error);
       } finally {
@@ -552,7 +723,7 @@ export default function MainPage() {
       {/* <div className="absolute top-6 left-6 z-20 flex items-center gap-12 rounded-[32px] border-[3px] border-[#d7c4b4] bg-[#f8efe4] px-4 py-3 shadow-[0_18px_45px_rgba(0,0,0,0.14)]"> */}
       <div className="absolute top-4 left-4 right-4 z-20 flex items-center justify-between rounded-[40px] bg-[#2c1f14]/80 backdrop-blur-md px-6 py-3 shadow-[0_8px_32px_rgba(0,0,0,0.3)] border border-[#ffffff15]">
 
-      {/* Left — Profile */}
+      {/* Left - Profile */}
       <div className="relative">
         <button
           onClick={() => toggle("avatar")}
@@ -591,10 +762,10 @@ export default function MainPage() {
         )}
       </div>
 
-      {/* Center — Tier Progress */}
+      {/* Center - Tier Progress */}
       <div className="flex flex-col items-center gap-1 min-w-[260px]">
         <span className="text-[#f0d5be] text-xs font-bold tracking-widest uppercase opacity-80">
-          {tierName} — Tier {tierInfo.tier}
+          {tierName} - Tier {tierInfo.tier}
         </span>
 
         {/* XP labels */}
@@ -645,7 +816,7 @@ export default function MainPage() {
         )}
       </div>
 
-      {/* Right — Workouts + Master Control */}
+      {/* Right - Workouts + Master Control */}
       <div className="flex items-center gap-3">
 
         {/* Workouts */}
@@ -863,6 +1034,16 @@ export default function MainPage() {
                 </select>
               </div>
             </div>
+
+            {/* Fitzy form tip */}
+            {selectedWorkout && fitzyTips[selectedWorkout] && (
+              <div style={{ display: "flex", alignItems: "center", gap: "12px", background: "#f8f1e7", border: "1px solid #a39893", borderRadius: "16px", padding: "12px 16px", marginBottom: "16px" }}>
+                <img src="/questioning.svg" alt="Fitzy" style={{ width: "64px", height: "64px", flexShrink: 0 }} />
+                <p style={{ margin: 0, fontSize: "13px", fontWeight: 600, color: "#2c1f14", lineHeight: "1.5" }}>
+                  {fitzyTips[selectedWorkout]}
+                </p>
+              </div>
+            )}
 
             <div style={{ display: "grid", gap: "16px", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", marginBottom: "24px" }}>
               <label style={{ display: "flex", flexDirection: "column", gap: "8px", fontWeight: 700, color: "#0f172a" }}>
@@ -1279,6 +1460,211 @@ export default function MainPage() {
 
       {/* Overlay */}
       <div className="pointer-events-none absolute inset-0 bg-black/20 z-0" />
+
+      {/* Fitzy the Dog */}
+
+      {/* Fitzy SVG, made it pinned to bottom-right, large, pushed into the bottom of the screen */}
+      <button
+        onClick={() => setFitzyBubbleVisible((v) => !v)}
+        title="Chat with Fitzy"
+        style={{
+          position: "fixed",
+          bottom: -53,
+          right: -225,
+          zIndex: 9999,
+          background: "none",
+          border: "none",
+          cursor: "pointer",
+          padding: 0,
+          lineHeight: 0,
+          transform: "translateY(12%)",
+        }}
+      >
+        <img
+          src={`/${fitzyExpression}.svg`}
+          alt="Fitzy the dog"
+          style={{
+            width: "700px",
+            height: "700px",
+            objectFit: "contain",
+            objectPosition: "bottom right",
+            display: "block",
+          }}
+        />
+      </button>
+
+      {/* Goals button - anchored next to Fitzy */}
+      <button
+        onClick={() => {
+          setOpenGoalsPanel(true);
+          setFitzyExpression("happy");
+          setFitzyMessage(goals.length > 0 ? "Here are your goals! Add a new one or keep crushing them!" : "What are you training for? Tell me your goal!");
+          setFitzyBubbleVisible(true);
+        }}
+        style={{
+          position: "fixed",
+          bottom: "5px",
+          right: "190px",
+          zIndex: 9999,
+          background: "#f5e6d3",
+          border: "2px solid #55473d",
+          borderRadius: "20px",
+          padding: "8px 16px",
+          cursor: "pointer",
+          fontSize: "13px",
+          fontWeight: 700,
+          color: "#2c1f14",
+          boxShadow: "0 4px 14px rgba(0,0,0,0.15)",
+        }}
+      >
+        🎯 Goals {goals.length > 0 && `(${goals.length})`}
+      </button>
+
+      {/* Speech bubble - sits above the Goals button */}
+      {fitzyBubbleVisible && (
+        <div
+          style={{
+            position: "fixed",
+            bottom: "125px",
+            right: "110px",
+            zIndex: 9999,
+            background: "#f5e6d3",
+            border: "2px solid #55473d",
+            borderRadius: "20px",
+            padding: "12px 36px 12px 14px",
+            maxWidth: "240px",
+            boxShadow: "0 8px 28px rgba(0,0,0,0.18)",
+            fontSize: "13px",
+            fontWeight: 600,
+            color: "#2c1f14",
+            lineHeight: "1.5",
+          }}
+        >
+          <button
+            onClick={handleFitzyDismiss}
+            style={{ position: "absolute", top: "6px", right: "10px", background: "none", border: "none", cursor: "pointer", fontSize: "16px", color: "#94a3b8", lineHeight: 1, padding: 0 }}
+          >
+            ×
+          </button>
+          <p style={{ margin: 0 }}>{fitzyMessage}</p>
+          {/* Bubble tail pointing down */}
+          <div style={{ position: "absolute", bottom: "-11px", right: "50px", width: 0, height: 0, borderLeft: "10px solid transparent", borderRight: "10px solid transparent", borderTop: "10px solid #55473d" }} />
+          <div style={{ position: "absolute", bottom: "-8px", right: "52px", width: 0, height: 0, borderLeft: "8px solid transparent", borderRight: "8px solid transparent", borderTop: "8px solid #f5e6d3" }} />
+        </div>
+      )}
+
+      {/* Goals Panel */}
+      {openGoalsPanel && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 99999,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: "24px",
+            backgroundColor: "rgba(0,0,0,0.75)",
+          }}
+        >
+          <div
+            style={{
+              position: "relative",
+              width: "100%",
+              maxWidth: "580px",
+              backgroundColor: "#e7d5cd",
+              border: "4px solid #55473d",
+              borderRadius: "24px",
+              padding: "28px",
+              boxShadow: "0 30px 80px rgba(0,0,0,0.35)",
+            }}
+          >
+            {/* Header */}
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                <img src="/questioning.svg" alt="Fitzy" style={{ width: "54px", height: "54px" }} />
+                <div>
+                  <h2 style={{ margin: 0, fontSize: "22px", fontWeight: 700 }}>My Goals</h2>
+                  <p style={{ margin: 0, color: "#64748b", fontSize: "13px" }}>Tell Fitzy what you&apos;re training for</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setOpenGoalsPanel(false)}
+                style={{ borderRadius: "999px", background: "#e2e8f0", padding: "10px 16px", fontSize: "14px", fontWeight: 600, color: "#0f172a", border: "none", cursor: "pointer" }}
+              >
+                Close
+              </button>
+            </div>
+
+            {/* Input row */}
+            <div style={{ display: "flex", gap: "10px", marginBottom: "20px" }}>
+              <input
+                type="text"
+                value={newGoalText}
+                onChange={(e) => setNewGoalText(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter") handleSaveGoal(); }}
+                placeholder="e.g. I want bigger arms, run 5km…"
+                style={{ flex: 1, borderRadius: "16px", border: "2px solid #a39893", padding: "12px 16px", fontSize: "14px", background: "white", outline: "none" }}
+              />
+              <button
+                type="button"
+                onClick={handleSaveGoal}
+                style={{ borderRadius: "16px", background: "#2c1f14", color: "white", padding: "12px 20px", fontWeight: 700, border: "none", cursor: "pointer", fontSize: "14px" }}
+              >
+                Set Goal
+              </button>
+            </div>
+
+            {/* Goals list */}
+            {goals.length === 0 ? (
+              <div style={{ textAlign: "center", padding: "32px 20px", color: "#64748b" }}>
+                <p style={{ margin: 0 }}>No goals yet! Tell Fitzy what you&apos;re working toward</p>
+              </div>
+            ) : (
+              <div style={{ display: "grid", gap: "14px", maxHeight: "420px", overflowY: "auto" }}>
+                {goals.map((goal, i) => {
+                  const suggestion = goal.id ? goalSuggestions[goal.id] : undefined;
+                  return (
+                    <div key={goal.id ?? i} style={{ background: "#f8f1e7", border: "1px solid #a39893", borderRadius: "16px", overflow: "hidden" }}>
+                      {/* Goal row */}
+                      <div style={{ padding: "14px 16px", display: "flex", alignItems: "center", gap: "10px" }}>
+                        <span style={{ fontSize: "18px" }}>🎯</span>
+                        <span style={{ fontSize: "14px", fontWeight: 600, color: "#2c1f14" }}>{goal.text}</span>
+                      </div>
+
+                      {/* Suggestion card */}
+                      {suggestion && (
+                        <div style={{ borderTop: "1px solid #d4c0b7", background: "#ede0d4", padding: "12px 16px" }}>
+                          <div style={{ display: "flex", alignItems: "flex-start", gap: "10px", marginBottom: "10px" }}>
+                            <img src="/questioning.svg" alt="Fitzy" style={{ width: "36px", height: "36px", flexShrink: 0 }} />
+                            <p style={{ margin: 0, fontSize: "13px", fontWeight: 600, color: "#2c1f14", lineHeight: "1.5" }}>
+                              {suggestion.tip}
+                            </p>
+                          </div>
+                          <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", marginBottom: "8px" }}>
+                            {suggestion.exercises.map((ex) => (
+                              <span
+                                key={ex}
+                                style={{ background: "#2c1f14", color: "#f5e6d3", fontSize: "11px", fontWeight: 700, padding: "4px 10px", borderRadius: "999px" }}
+                              >
+                                {ex}
+                              </span>
+                            ))}
+                          </div>
+                          <p style={{ margin: 0, fontSize: "11px", color: "#64748b", fontStyle: "italic" }}>
+                            Find these in the Workouts menu ↑
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
     </div>
   );
