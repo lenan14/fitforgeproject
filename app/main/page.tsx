@@ -648,7 +648,16 @@ export default function MainPage() {
 
   // [Add XP For Master Control] - Master Control function for testing
   const handleAddXP = (xpAmount: number) => {
-    setTotalXP((prevXP) => Math.min(prevXP + xpAmount, xpTierThresholds[xpTierThresholds.length - 1]));
+    const oldTier = getTierFromXP(totalXP);
+    const newXP = Math.min(totalXP + xpAmount, xpTierThresholds[xpTierThresholds.length - 1]);
+    const newTier = getTierFromXP(newXP);
+    setTotalXP(newXP);
+    if (newTier > oldTier) {
+      setFitzyExpression("happy");
+      setFitzyMessage(`Awesome! You hit Tier ${newTier} - ${getTierName(newTier)}! 🎉`);
+      setFitzyBubbleVisible(true);
+      setIsGreetingMessage(false);
+    }
     console.log(`Added ${xpAmount} XP for testing`);
   };
 
